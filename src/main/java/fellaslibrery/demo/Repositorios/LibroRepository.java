@@ -7,21 +7,11 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface LibroRepository extends JpaRepository<Libro, Long> {
+public interface LibroRepository extends JpaRepository<Libro, Integer> {
 
-    /**
-     * Buscar libros cuyo nombre contenga un texto dado (ignora
-     * mayúsculas/minúsculas)
-     */
-    List<Libro> findByNombreContainingIgnoreCase(String nombre);
+    List<Libro> findByTituloContainingIgnoreCase(String titulo);
 
-    /**
-     * Buscar libros por su ISBN
-     */
     List<Libro> findByIsbn(String isbn);
 
-    /**
-     * Verificar si un libro ya existe por su ISBN
-     */
     boolean existsByIsbn(String isbn);
 }
