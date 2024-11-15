@@ -1,45 +1,69 @@
-package com.spring.servicios;
+package com.tu_proyecto.service;
 
-import com.spring.modelos.Compra;
-import com.spring.repositorios.CompraRepository;
+import com.tu_proyecto.dto.CompraRequest;
+import com.tu_proyecto.model.Compra;
+import com.tu_proyecto.model.Libro;
+import com.tu_proyecto.model.Usuario;
+import com.tu_proyecto.repository.CompraRepository;
+import com.tu_proyecto.repository.LibroRepository;
+import com.tu_proyecto.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class CompraService {
 
     @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private LibroRepository libroRepository;
+
+    @Autowired
     private CompraRepository compraRepository;
 
-    // Crear o guardar una compra
-    public Compra saveCompra(Compra compra) {
-        return compraRepository.save(compra);
-    }
+    @Transactional
+    public List<Compra> realizarCompra(CompraRequest request) {
+        Usuario usuario = usuarioRepository.findById(request.getUsuarioId())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-    // Obtener una compra por ID
-    public Optional<Compra> getCompraById(Long id) {
-        return compraRepository.findById(id);
-    }
+        double totalCompra = 0;
+        List<Compra> comprasRealizadas = new ArrayList<>();
 
-    // Obtener todas las compras
-    public List<Compra> getAllCompras() {
-        return compraRepository.findAll();
-    }
+        for (CompraRequest.LibroCompra libroCompra : request.getLibros()) {
+            Libro libro = libroRepository.findById(libroCompra.getLibroId())
+                    .orElseThrow(() -> new RuntimeException("Libro no encontrado"));
 
-    // Actualizar una compra
-    public Compra updateCompra(Long id, Compra compraDetalles) {
-        Compra compra = compraRepository.findById(id).orElseThrow(() -> new RuntimeException("Compra no encontrada"));
-        compra.setUsuario(compraDetalles.getUsuario());
-        compra.setLibros(compraDetalles.getLibros());
-        compra.setTotal(compraDetalles.getTotal());
-        return compraRepository.save(compra);
-    }
+            if (libro.getStock() < libroCompra.getCantidad()) {
+                throw new RuntimeException("Stock insuficiente para el libro: " + libro.getTitulo());
+            }
 
-    // Eliminar una compra
-    public void deleteCompra(Long id) {
-        compraRepository.deleteById(id);
+            double totalLibro = libro.getPrecioFlcoin() * libroCompra.getCantidad();
+            totalCompra += totalLibro;
+
+            Compra compra = new Compra();
+            compra.setUsuario(usuario);
+            compra.setLibro(libro);
+            compra.setCantidad(libroCompra.getCantidad());
+            compra.setTotal(totalLibro);
+            compraRepository.save(compra);
+            comprasRealizadas.add(compra);
+
+            libro.setStock(libro.getStock() - libroCompra.getCantidad());
+            libroRepository.save(libro);
+        }
+
+        if (usuario.getTarjeta().getSaldo() < totalCompra) {
+            throw new RuntimeException("Saldo insuficiente en la tarjeta de membresía");
+        }
+
+        usuario.getTarjeta().setSaldo(usuario.getTarjeta().getSaldo() - totalCompra);
+        usuarioRepository.save(usuario);
+
+        return comprasRealizadas;
     }
 }
